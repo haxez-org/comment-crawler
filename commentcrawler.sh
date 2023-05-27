@@ -1,70 +1,66 @@
 #!/bin/bash
+echo "
+ ██████╗ ██████╗ ███╗   ███╗███╗   ███╗███████╗███╗   ██╗████████╗     ██████╗██████╗  █████╗ ██╗    ██╗██╗     ███████╗██████╗
+██╔════╝██╔═══██╗████╗ ████║████╗ ████║██╔════╝████╗  ██║╚══██╔══╝    ██╔════╝██╔══██╗██╔══██╗██║    ██║██║     ██╔════╝██╔══██╗
+██║     ██║   ██║██╔████╔██║██╔████╔██║█████╗  ██╔██╗ ██║   ██║       ██║     ██████╔╝███████║██║ █╗ ██║██║     █████╗  ██████╔╝
+██║     ██║   ██║██║╚██╔╝██║██║╚██╔╝██║██╔══╝  ██║╚██╗██║   ██║       ██║     ██╔══██╗██╔══██║██║███╗██║██║     ██╔══╝  ██╔══██╗
+╚██████╗╚██████╔╝██║ ╚═╝ ██║██║ ╚═╝ ██║███████╗██║ ╚████║   ██║       ╚██████╗██║  ██║██║  ██║╚███╔███╔╝███████╗███████╗██║  ██║
+ ╚═════╝ ╚═════╝ ╚═╝     ╚═╝╚═╝     ╚═╝╚══════╝╚═╝  ╚═══╝   ╚═╝        ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝ ╚══╝╚══╝ ╚══════╝╚══════╝╚═╝  ╚═╝
 
-# Function to display a progress bar
-function show_progress() {
-  local progress
-  local total_length
-  local completed_length
-  local bar_length
-  local percentage
+About:
+        Built By ChatGPT, Concept by Haxez.
+        Comment Crawler is a bash script that looks for comments. 
+        Supply an IP address or URL.
+        It will then recursivly crawl and report comments.
+        You can pipe the output to tee and save it.
+        You can then grep for key words to find sensitve content. 
 
-  progress=$1
-  total_length=50
-  completed_length=$((progress * total_length / 100))
-  bar_length=$((total_length - completed_length))
-  percentage=$((progress * 100 / total_length))
-
-  printf "\r[%-${completed_length}s%${bar_length}s] %3d%%" "█" "" "$percentage"
-}
-
-# Print script name and ASCII art
-echo "Comment Crawler"
-echo ""
-echo "   / \\"
-echo "  [ o o ]"
-echo "   \\=_=/"
-echo "   /   \\"
-echo "  /_____\\"
-echo ""
-
-# Check if URL/IP address is provided as an argument
+Disclaimer:
+        Haxez does not condine the use of this tool for malicious purposes.
+        It should only be used on targets you have permission to test.
+        The purpose of this tool is to find comments. 
+        If they contain sensitve information, they can be removed.
+"
+sleep 5;
+# Check if an argument is provided
 if [ -z "$1" ]; then
-  echo "Please provide a URL or IP address."
+  echo "Usage: $0 [IP address or URL]"
   exit 1
 fi
 
-# Store the supplied URL/IP
-url_ip=$1
+# Get the base URL or IP address
+base_url=$(echo "$1" | awk -F/ '{print $1}')
 
-# Fetch the page source
-page_source=$(curl -s "$url_ip")
+# Function to crawl the site recursively
+function crawl_site() {
+  local url="$1"
+  local parent_path="$2"
 
-# Extract and report comments using grep
-comments=$(echo "$page_source" | grep -oP '<!--[\s\S]*?-->')
+  # Fetch the page content
+  page_content=$(curl -s "$url")
 
-# Check if any comments are found
-if [ -z "$comments" ]; then
-  echo "No comments found on $url_ip."
-else
-  echo "Comments found on $url_ip:"
+  # Find comments in the page content
+  comments=$(echo "$page_content" | grep -oP "<!--.*?-->")
 
-  # Calculate total number of comments
-  total_comments=$(echo "$comments" | wc -l)
+  # Print the path and comments if found
+  if [ -n "$comments" ]; then
+    echo "Comment found at: $parent_path"
+    echo "Comment: $comments"
+    echo
+  fi
 
-  # Set initial progress to 0
-  progress=0
+  # Find links in the page content
+  links=$(echo "$page_content" | grep -oP 'href="\K[^"]*')
 
-  # Iterate through each comment and display progress bar
-  while IFS= read -r comment; do
-    echo "$comment"
+  # Recursively crawl the links
+  for link in $links; do
+    if [[ $link == /* ]]; then
+      crawl_site "$base_url$link" "$parent_path$link"
+    elif [[ $link == http* ]]; then
+      crawl_site "$link" "$link"
+    fi
+  done
+}
 
-    # Increment progress by 1 for each comment
-    progress=$((progress + 1))
-
-    # Display progress bar
-    show_progress $((progress * 100 / total_comments))
-  done <<< "$comments"
-
-  # Move to the next line after the progress bar is complete
-  echo ""
-fi
+# Start crawling the site
+crawl_site "$1" "$1"
